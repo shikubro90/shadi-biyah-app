@@ -1,0 +1,93 @@
+import 'dart:convert';
+
+import 'package:flutter/widgets.dart';
+import 'package:get/get.dart';
+import 'package:matrimony/core/global/api_url_container.dart';
+import 'package:matrimony/core/helper/sharedpreference_helper.dart';
+import 'package:matrimony/core/route/app_route.dart';
+import 'package:matrimony/utils/app_static_strings.dart';
+import 'package:matrimony/utils/app_utils.dart';
+import 'package:matrimony/view/screens/profile/profile_controller/profile_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+
+class FamilyDetailsController extends GetxController {
+  ProfileController profileController = Get.find<ProfileController>();
+
+  TextEditingController familyStatusController = TextEditingController();
+  TextEditingController familyValueController = TextEditingController();
+  TextEditingController familyTypeController = TextEditingController();
+  TextEditingController familyIncomeController = TextEditingController();
+  TextEditingController fatherOccupationController = TextEditingController();
+  TextEditingController motherOccupationController = TextEditingController();
+  TextEditingController brothersController = TextEditingController();
+  TextEditingController sisterController = TextEditingController();
+
+  bool isLoading = false;
+
+  Future<void> updateFamilyDetails({required bool isUpdate}) async {
+    isLoading = true;
+    update();
+
+    final prefs = await SharedPreferences.getInstance();
+
+    String? id = prefs.getString(SharedPreferenceHelper.userIdKey);
+    String? token = prefs.getString(SharedPreferenceHelper.token);
+
+    var request = http.MultipartRequest(
+      "PATCH",
+      Uri.parse(
+          "${ApiUrlContainer.baseURL}${ApiUrlContainer.updateProfile}$id"),
+    );
+    Map<String, dynamic> params = {
+      "familyStatus": familyStatusController.text,
+      "familyType": familyTypeController.text,
+      "familyValues": familyValueController.text,
+      "familyIncome": familyIncomeController.text,
+      "fathersOccupation": fatherOccupationController.text,
+      "mothersOccupation": motherOccupationController.text,
+      "brothers": brothersController.text,
+      "sisters": sisterController.text,
+      "isFamilyInformationCompleted": "true",
+    };
+
+    params.forEach((key, value) {
+      request.fields[key] = value;
+    });
+    request.headers['Content-Type'] = 'multipart/form-data';
+    request.headers['Authorization'] = "Bearer $token";
+    // Send the request
+    var response = await request.send();
+
+    String responseBody = await response.stream.bytesToString();
+
+    // Parse the JSON string
+    Map<String, dynamic> parsedResponse = jsonDecode(responseBody);
+
+    // Access the "message" field
+    String message = parsedResponse['message'];
+
+    if (response.statusCode == 200) {
+      TostMessage.toastMessage(message: AppStaticStrings.familyDetailsUpdated);
+      if (isUpdate) {
+        profileController.myProfile();
+        navigator!.pop();
+      } else {
+        Get.toNamed(AppRoute.lifeStyle, arguments: [
+          AppStaticStrings.lifeStyle,
+          "",
+          '',
+          '',
+          '',
+          '',
+          '',
+          false
+        ]);
+      }
+    } else {
+      TostMessage.toastMessage(message: message);
+    }
+    isLoading = false;
+    update();
+  }
+}
